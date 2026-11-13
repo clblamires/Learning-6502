@@ -1,0 +1,7 @@
+# Build outputs
+build/
+*.o
+*.nes
+
+# macOS files
+.DS_Store
