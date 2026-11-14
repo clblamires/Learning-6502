@@ -11,17 +11,41 @@ Each register stores a byte, a number between 0 and 255
 
 ## Opcodes
 
-ADC - Add with carry
+ADC - Add with carry (adds to accumulator)
+
+BEQ - Branch Equal, or "Branch if Equal"
 
 CLC - Clear the carry
 
+CMP - Compare accumulator against a value
+
+CPX - Compare X against a value
+
+CPY - Compare Y against a value
+
+DEX - Decrement X (subtracts 1 from X register's value)
+
+DEY - Decrement X (subtracts 1 from Y register's value)
+
 INX - Increment X (adds 1 to X register's value)
+
+INY - Increment Y (adds 1 to Y register's value)
+
+JMP - Jump to a label
+
+JSR - Jump to Subroutine
 
 LDA - Load Accumulator
 
 LDX - Load X register
 
 LDY - Load Y register
+
+PHA - Push Accumulator (stack operations)
+
+PLA - Pull Accumulator (stack operations)
+
+RTS - Return from Subroutine
 
 SBC - Subtract with carry
 
@@ -192,3 +216,232 @@ LDA #%10000101 ; loads 133, N is 1 because the highest bit is 1.
 This is because the 6502 processor interprets bytes as signed numbers (positive and negative) between -128 and +127.
 
 The N flag doesn't literally mean the number is negative in all cases. It just means the highest bit is a 1.
+
+### Comparing values with the CMP operator
+
+CMP means "Compare Accumulator", meaning it compares a value with what is in the accumulator and updates the processor flags based on the result. Notably, it does NOT change the value in A.
+
+The processor effectively performs a subtraction to determine the relationship beween the two values, putting the result in the Zero flag.
+
+```
+;;; CMP should return the equivalent of "true", which sets the Zero flag to 1
+LDA #5
+CMP #5
+; result is 0, which sets the Zero flag to 1
+
+;;; example with a return equivalent of "false", which sets the Zero flag to 0 (meaning "not zero")
+LDA #5
+CMP #4
+; result is 1, which is not zero, so it sets to Zero flag to 0
+```
+Likewise this will set the Negative flag if it does subtraction for a negative number:
+```
+LDA #5
+CMP #6
+; sets zero flag to 0
+; also sets Negative flag to 1 because 5 - 6 = -1
+```
+
+CPX and CPY are for comparing X or Y registers against a value
+
+### Branching
+
+BEQ - Branch equal, or "Branch if Equal"
+
+Branches based on the Zero flag's value (branches if zero bit is a 1)
+
+```
+LDA #5
+CMP #5
+BEQ equal
+    ; code skipped if the branch happens
+
+equal: 
+    ; code runs if equal!
+```
+
+Other branching instructions
+- BEQ - Branch if equal (condition Z = 1) ***
+- BNE - Branch if NOT equal (Z = 0) ***
+- BCS - Branch if Carry is set (C = 1)
+- BCC - Branch if Carry is clear (C = 0)
+- BMI - Branch if minus, meaning result is negative (N = 1)
+- BPL - Branch if plus, meaning result is positive (N = 0)
+- BVS - Branch if oVerflow set (V = 1)
+- BVC - Branch if oVerflow is clear (V = 0)
+
+```
+;;; Example: if the player has 3 health
+LDA $00
+CMP #0
+BEQ gameOver
+    ; continue playing
+
+gameOver:
+    ; game over screen!
+```
+
+### JMP - Jump to a label
+
+```
+LDA $00
+CMP #0
+BEQ gameOver;
+
+; Player still has health
+JMP continuePlaying
+
+gameOver:
+    ; Game over code goes here
+    JMP finished
+
+continuePlaying:
+    ; Normal gameplay in here
+
+finished:
+    ; end of the game
+```
+
+## Loops
+
+6502 doesn't have a built in `for` loop so we have to make one ourselves. We do this by using a register to keep track of our count, doing whatever instruction, and using a branch instruction to jump back up and repeat
+
+Opcodes used here are INX, INY, DEX, DEY (increment and decrement X or Y registers)
+
+```
+LDX #5  ; sets x to 5
+INX     ; increases x to 6
+
+; likewise
+LDX #5  ; sets x to 5
+DEX     ; decreases x to 4
+```
+
+These opcodes update the Zero and Negative flags. We use that to control the loop
+
+```
+; Our first loop!
+LDX #5
+loop:
+    DEX         ; decreases x by 1
+    BNE loop    ; Branch if not equal, go to loop
+; This loops 5 times
+; code here runs after the loop is finished! :)
+```
+
+```
+; Loop to keep adding 1 to A
+LDA #0
+LDX #5 ; loop 5 times
+loop:
+    CLC
+    ADC #1 ; add 1 to A
+    DEX    ; decrement X
+    BNE loop
+STA $00 ; stores value of A into memory
+```
+
+When looping down from a number to zero, BNE (branch if not equal) is perfectly fine. But when counting *up* from zero to another number, remember that BNE looks at the Zero flag. This code will fail:
+
+```
+LDX #0
+loop:
+    INX         ; increment x by 1
+    BNE loop    ; branch if not equal (Zero) back to loop
+; the zero flag is 0, which causes the branch to loop immediately. This loop will never end
+```
+
+```
+; A CORRECT loop counting up from zero to five 
+LDX #0
+loop:
+    ; do stuff
+    INX         ; x = x + 1
+    CPX #5      ; compare X with #5
+    BNE loop
+```
+
+## Subroutines and the Stack
+
+Subroutines are reusable chunks of code, like functions. We'll use these things for this:
+
+- JSR - Jump to subroutine
+- RTS - Return from subroutine
+- The Stack - temporary storage
+- PHA and PLA - push and pull from the stack (accumulator)
+
+Example:
+
+```
+LDA #5
+JSR doubleNumber ; jumps to doubleNumber
+
+STA $00
+; other program instructions...
+
+doubleNumber:
+    ASL A ; arithmetic shift left (doubles the number)
+    RTS   ; return from subroutine
+
+; the results of this stores the number 10 in $00
+```
+
+But how does RTS know where to go? The Stack!
+
+The 6502 processor has a built-in stack located in memory addresses `$0100` to `$01FF` (256 bytes of stack space). There is a special register called Stack Pointer (S) that keeps track of where the top of the stack currently is. 
+
+Two opcodes can put things onto the stack or pull from the stack. Those are PHA and PLA (push A and pull A)
+
+```
+LDA #10     ; save 10 to accumulator
+PHA         ; Push A to stack (10)
+LDA #25     ; save 25 to accumulator
+PLA         ; Pull from stack, retrieves the saved 10
+```
+
+### Nested subroutines and the stack
+
+```
+LDA #5
+JMP main
+
+main:
+    JSR calculate
+    ; continue here afterwards
+
+calculate:
+    JSR doubleNumber
+    RTS
+
+doubleNumber:
+    ASL A
+    RTS
+```
+
+This is an example of a nested subroutine, or a sub that calls another sub. The 6502 processor will remember what is on the top of the stack.
+
+The top of the stack is $01FF. The bottom of the stack is $0100. The stack points downward in memory. When the stack is empty, the stack pointer is $FF.
+
+### Saving and restoring processor flags
+
+- PHP: Push processor status onto the stack
+- PLP: Pull processor status from the stack
+
+These are the processor flags like Carry, Zero, Negative, Overflow, etc.
+
+```
+LDA #$FF    ; load $FF (255) into A
+CLC         ; clear carry
+
+PHP         ; Push processor status to the stack
+
+SEC         ; Set carry
+LDA #10     ; Load 10 into Accumulator
+ADC #5      ; Add 5 to the accumulator
+
+PLP         ; Pull processor status from the stack
+```
+
+A good rule of thumb is that every PHA needs a matching PLA, and every PHP needs a matching PLP. Don't leave things on the stack.
+
+Something else to consider: JSR and RTS manage their own addresses. Don't pull them off the stack!

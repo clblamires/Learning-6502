@@ -15,6 +15,11 @@ SEC
 SBC #4
 STA $01
 
+LDA #0
+CLC
+ADC #1 ; sets A to 1
+CLC
+ADC #1 ; sets A to 2
 ; omg :)
 
 ; Quiz:
