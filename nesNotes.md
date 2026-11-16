@@ -296,8 +296,8 @@ MEMORY {
     # where the header starts, file = %O means fill in with object data we compiled
     HEADER: start = $0000, size = $0010, file = %O;
 
-    # where the program starts. The size means this goes from $8000 to $FFFF
-    PRG: start = $8000, size = $8000, file = %O, fill = yes;
+    # where the program starts. The size means this goes from $8000 to $FFF9
+    PRG: start = $8000, size = $7FFA, file = %O, fill = yes;
 
     # vectors. The NES needs to know where to start executing when it powers on. It doesn't automatically go to $8000. There's a reset vector that contains the address of the first instruction the NES should execute when powering on. The vector table is the last six bytes of PRG-ROM.
     VECTORS: start = $FFFA, size = $0006, file=%O;
@@ -306,3 +306,26 @@ MEMORY {
     CHR: start = $0000, size = $2000, file = %O, fill = yes;
 }
 ```
+
+## CHR-ROM
+It's time to put graphics into the console.
+
+The first tile in CHR-ROM will have a tile id of $00. The second tile would be $01, etc.
+
+The PPU's first nametable is located at $2000 and contains 960 tile IDs, followed by 64 bytes of attribute information. 
+
+The PPUADDR register sets PPU memory locations and is located at $2006. We write the high byte first, then the low byte.
+
+```
+; Example to select $2000
+LDA #$20    ; 20
+STA $2006
+LDA #$00    ; 00
+STA $2006   ; total: $2000
+```
+
+$2007 - PPUDATA is what we use to write the actual data. If we write 960 zeroes (total tiles on the screen at a time), then we fill all 960 tiles sequentially. 
+
+If we wanted to write tile $00 to all 960 positions, we *could* write `STA $2007` 960 times but... that's a lot of lines of code. We can't use a simple loop over register X to do it because register X can hold only one byte at a time. A byte's maximum value is $FF or 255. 255 is a far cry from 960. What do we do?
+
+Nested loops! With the DEX (decrement X) and BNE (branch if not equal) copcodes 
