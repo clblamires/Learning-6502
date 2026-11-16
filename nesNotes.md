@@ -251,3 +251,58 @@ Bitplates
 Bitplane 0: %01011001
 Bitplane 1: %00110011
 ```
+
+## Making the ROM
+
+An NES ROM file contains the following:
+- iNES header, 16 bytes of cartridge information
+- PRG-ROM, the game's executable code
+- CHR-ROM, the graphic files
+
+### iNES header
+The header of the ROM is 16 bytes. This tells the emulator or actual NES hardware that this is an NES cartridge, how much PRG-ROM it contains, how much CHR-ROM it contains, which mapper the cartridge uses, and what mirror configuration it needs. 
+
+```
+The first four bytes of an NES rom:
+
+4E 45 53 1A
+N  E  S  [special marker]
+```
+
+### PRG-ROM
+Where our assembly program goes. When ca65 assembles our .s files into object files, the ld65 program will link those object files together and place their contents at the proper memory addresses.
+
+Our game will eventually live in the cartridge's CPU address space, usually `$8000-$FFFF`.
+
+### CHR-ROM
+Graphics go here! The PPU reads the patterns from the CHR. 
+
+## NROM
+A mapper is hardware inside the cartridge that helps manage how the CPU and PPU access cartridge memory. NROM is mapper 0. It does not do any bank switching, meaning it doesn't swap out one set of graphics for another on the fly.
+
+| Component | NROM-128 | NROM-256 |
+| - | - |
+| PRG-ROM | 16 KB | 32 KB |
+| CHR-ROM | 8 KB | 8 KB |
+| Mapper | 0 | 0 |
+
+NROM-256 gives us 32 KB of program space and 8 KB of graphic space. 
+
+## nes.cfg
+This is the linker configuration file for ld65. It tells ld65 how to organize the pieces of our program in the final ROM. 
+
+```
+MEMORY {
+    # where the header starts, file = %O means fill in with object data we compiled
+    HEADER: start = $0000, size = $0010, file = %O;
+
+    # where the program starts. The size means this goes from $8000 to $FFFF
+    PRG: start = $8000, size = $8000, file = %O, fill = yes;
+
+    # vectors. The NES needs to know where to start executing when it powers on. It doesn't automatically go to $8000. There's a reset vector that contains the address of the first instruction the NES should execute when powering on. The vector table is the last six bytes of PRG-ROM.
+    VECTORS: start = $FFFA, size = $0006, file=%O;
+
+    # CHR is graphics memory. It starts at $0000, the beginning of the PPU's pattern-table address space. It's size is $2000, or 8 KB.
+    CHR: start = $0000, size = $2000, file = %O, fill = yes;
+}
+```
