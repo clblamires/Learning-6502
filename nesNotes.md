@@ -223,3 +223,31 @@ waitForVblank:
     ; if its 0, keep waiting
     ; if its 1, we continue
 ```
+
+## Palettes and Colors
+
+The pixels of each tile uses two bits, giving it one of four possible color options. The palette tells the PPU what those color options are. There are two kinds of palettes, one for backgrounds and one for sprites. The sprite palette's first entry is transparent, allowing the background to show through. 
+
+- Background color index 0 is a "universal background" shared by all four background palettes. 
+- Sprite color index 0 is transparent.
+
+The PPU's palette memory stores the selection of palettes. Its main address range `is $3F00-$3F1F`.
+
+## Bitplanes and turning pixels into binary
+Every pixel is represented by two bits. The NES doesn't store these bits next to each other. They are instead stored in bitplanes.
+- Bitplane 0 stores the first (least significant) bit
+- Bitplane 1 stores the second (most significant) bit
+
+Example:
+
+```
+Imagine we have the following 8-pixel row with these color indices:
+0  1  2  3  1  0  2  3
+
+They are stored as:
+00 01 10 11 01 00 10 11
+
+Bitplates
+Bitplane 0: %01011001
+Bitplane 1: %00110011
+```
